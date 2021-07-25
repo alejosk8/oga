@@ -1,57 +1,88 @@
-FROM odoo:14.0
+DE debian: buster-slim
+MANTENIMIENTO Odoo SA <info@odoo.com>
 
-LABEL MAINTAINER Daniel Obando <kuntursoftec@gmail.com>
-USER root
+SHELL [ "/ bin / bash" , "-xo" , "pipefail" , "-c" ]
 
-RUN pip3 install pyjwt
-# RUN set -x; \
-#         apt-get update \
-#         && apt-get install -y --no-install-recommends python-dev\
-#             build-essential \
-#             gcc \
-#             tesseract-ocr-eng \
-#             tesseract-ocr\
-#             libtesseract-dev\
-#             python-pil\
-#             python-bs4 
+# Genere la configuración regional C.UTF-8 para postgres y datos de configuración regional general
+ENV LANG C.UTF-8
 
-RUN set -x; \
-        apt-get update \
-        && apt-get install -y --no-install-recommends python3-dev\
-            build-essential \
-            gcc \
-            python3-cffi \
-            libxml2-dev \
-            libxslt1-dev \
-            libssl-dev \
-            python3-lxml \
-            python3-cryptography \
-            python3-openssl  \
-            python3-defusedxml \
-        && pip3 install --upgrade setuptools  pip \
-        && pip3 install cryptography \
-            ipaddress \
-            signxml 
+# Instale algunos deps, lessc y less-plugin-clean-css, y wkhtmltopdf
+EJECUTAR apt-get update && \
+    apt-get install -y --no-install-recomienda \
+        certificados de ca \
+        rizo \
+        dirmngr \
+        fonts-noto-cjk \
+        gnupg \
+        libssl-dev \
+        sin nodo \
+        npm \
+        python3-num2words \
+        python3-pdfminer \
+        python3-pip \
+        python3-phonenumbers \
+        python3-pyldap \
+        python3-qrcode \
+        python3-renderpm \
+        python3-setuptools \
+        python3-slugify \
+        python3-vobject \
+        python3-perro guardián \
+        python3-xlrd \
+        python3-xlwt \
+        xz-utils \
+    && curl -o wkhtmltox.deb -sSL https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.5/wkhtmltox_0.12.5-1.buster_amd64.deb \
+    && echo 'ea8277df4297afc507c61122f3c349af142f31e5 wkhtmltox.deb' | sha1sum -c - \
+    && apt-get install -y --no-install-recomienda ./wkhtmltox.deb \
+    && rm -rf / var / lib / apt / lists / * wkhtmltox.deb
 
-RUN apt-get clean && apt-get autoclean
+# instalar el último cliente de postgresql
+EJECUTE echo 'deb http://apt.postgresql.org/pub/repos/apt/ buster-pgdg main' > /etc/apt/sources.list.d/pgdg.list \
+    && GNUPGHOME = "$ (mktemp -d)" \
+    && exportar GNUPGHOME \
+    && repokey = 'B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8' \
+    && gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$ {repokey}" \
+    && gpg --batch --armor --export "$ {repokey}" > /etc/apt/trusted.gpg.d/pgdg.gpg.asc \
+    && gpgconf --kill all \
+    && rm -rf "$ GNUPGHOME" \
+    && apt-get update \
+    && apt-get install --no-install-recommended -y postgresql-client \
+    && rm -f /etc/apt/sources.list.d/pgdg.list \
+    && rm -rf / var / lib / apt / lists / *
 
-# RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-# RUN apt-get install -y gconf-service libasound2 libatk1.0-0 libcairo2 libcups2 libfontconfig1 libgdk-pixbuf2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libxss1 fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils
-# RUN curl https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb --output google-chrome-stable_current_amd64.deb
-# RUN dpkg -i google-chrome-stable_current_amd64.deb ; apt-get -fy install
-# RUN apt install --assume-yes chromium-browser
-RUN pip3 install phonenumbers
-RUN pip3 install selenium
+# Instalar rtlcss (en Debian buster)
+RUN NPM instalar rtlcss -g
 
-# RUN pip3 install pillow
-# RUN pip3 install tesseract
-# RUN pip3 install pytesseract
-# RUN pip3 install beautifulsoup4
-RUN pip3 install boto3
-RUN pip3 install lxml
-RUN pip3 install flex
-RUN pip3 install pynamodb
-# RUN pip3 install culqipy
-# RUN pip3 install mercadopago
-# RUN apt-get clean && apt-get autoclean
+# Instalar Odoo
+ENV ODOO_VERSION 14.0
+ARG ODOO_RELEASE = 20210720
+ARG ODOO_SHA = 897a15c05244de02eceac2a930d169f2010971a6
+EJECUTE curl -o odoo.deb -sSL http://nightly.odoo.com/${ODOO_VERSION}/nightly/deb/odoo_${ODOO_VERSION}.${ODOO_RELEASE}_all.deb \
+    && echo "$ {ODOO_SHA} odoo.deb" | sha1sum -c - \
+    && apt-get update \
+    && apt-get -y install --no-install-recomienda ./odoo.deb \
+    && rm -rf / var / lib / apt / lists / * odoo.deb
 
+# Copie el script de punto de entrada y el archivo de configuración de Odoo
+COPIA ./entrypoint.sh /
+COPIA ./odoo.conf / etc / odoo /
+
+# Establezca los permisos y monte / var / lib / odoo para permitir la restauración del almacén de archivos y / mnt / extra-addons para los complementos de los usuarios
+RUN chown odoo /etc/odoo/odoo.conf \
+    && mkdir -p / mnt / extra-addons \
+    && chown -R odoo / mnt / extra-addons
+VOLUMEN [ "/ var / lib / odoo" , "/ mnt / extra-addons" ]
+
+# Exponer los servicios de Odoo
+EXPONER 8069 8071 8072
+
+# Establecer el archivo de configuración predeterminado
+ENV ODOO_RC /etc/odoo/odoo.conf
+
+COPIA wait-for-psql.py /usr/local/bin/wait-for-psql.py
+
+# Establecer usuario predeterminado al ejecutar el contenedor
+USUARIO odoo
+
+ENTRYPOINT [ "/entrypoint.sh" ]
+CMD [ "odoo" ]
