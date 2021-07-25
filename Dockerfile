@@ -1,8 +1,9 @@
-DESDE odoo: 14.0
+FROM odoo:14.0
 
-MANTENIMIENTO DE ETIQUETAS Daniel Obando<kuntursoftec@gmail.com>
-USUARIO root
+LABEL MAINTAINER 
+USER root
 
-# EJECUTAR pip3 instalar pandas
-# EJECUTAR pip3 install numpy
-# EJECUTAR pip3 instalar beautifulsoup4
+# RUN pip3 install pandas
+# RUN pip3 install numpy
+# RUN pip3 install beautifulsoup4
+
